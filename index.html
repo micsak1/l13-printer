@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thermal label printer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0a;
+      color: #e8e8e8;
+      font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+      min-height: 100vh;
+    }
+
+    header {
+      border-bottom: 1px solid #222;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 32px; height: 32px; background: #1a1a1a; border: 1px solid #333;
+      border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px;
+    }
+    .title { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+    .subtitle { font-size: 11px; color: #888; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+
+    #battery {
+      font-size: 11px; color: #4a9; padding: 4px 10px; background: #111;
+      border-radius: 4px; border: 1px solid #222; display: none;
+    }
+
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; transition: background 0.3s; }
+    .dot.connected { background: #4a9; }
+    .dot.connecting { background: #ea3; }
+
+    .btn {
+      padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      cursor: pointer; font-family: inherit; border: none; transition: all 0.2s;
+    }
+    .btn-primary { background: #e8e8e8; color: #0a0a0a; }
+    .btn-secondary { background: transparent; color: #888; border: 1px solid #333; }
+    .btn-primary:hover { background: #fff; }
+    .btn-secondary:hover { border-color: #555; color: #aaa; }
+
+    .main {
+      display: flex; max-width: 960px; margin: 0 auto; padding: 24px;
+      gap: 24px; flex-wrap: wrap;
+    }
+    .controls { flex: 1 1 320px; min-width: 280px; }
+    .preview-col { flex: 1 1 300px; min-width: 260px; }
+
+    .tabs {
+      display: flex; gap: 2px; margin-bottom: 16px; background: #111;
+      border-radius: 8px; padding: 3px;
+    }
+    .tab {
+      flex: 1; padding: 8px 12px; background: transparent; color: #888; border: none;
+      border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+      font-family: inherit; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;
+    }
+    .tab.active { background: #222; color: #e8e8e8; }
+
+    .drop-zone {
+      width: 100%; padding: 32px 16px; background: #111; border: 2px dashed #333;
+      border-radius: 8px; color: #aaa; font-size: 13px; cursor: pointer;
+      font-family: inherit; margin-bottom: 16px; text-align: center; transition: border-color 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.dragover { border-color: #666; }
+
+    textarea {
+      width: 100%; background: #111; border: 1px solid #222; border-radius: 8px;
+      color: #e8e8e8; padding: 12px; font-size: 14px; font-family: inherit;
+      resize: vertical; outline: none;
+    }
+    textarea:focus { border-color: #444; }
+
+    .settings-box {
+      background: #111; border-radius: 8px; border: 1px solid #1a1a1a;
+      padding: 16px; margin-bottom: 16px;
+    }
+    .settings-title {
+      font-size: 11px; color: #555; text-transform: uppercase;
+      letter-spacing: 0.08em; margin-bottom: 12px;
+    }
+    .setting-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 12px; }
+    .setting-row:last-child { margin-bottom: 0; }
+    .setting-label { font-size: 12px; color: #b8b8b8; }
+    .setting-hint { font-size: 10px; color: #888; }
+
+    select {
+      background: #181818; color: #ddd; border: 1px solid #333; border-radius: 4px;
+      padding: 5px 8px; font-family: inherit; font-size: 11px; max-width: 190px;
+    }
+
+    .density-btn {
+      width: 32px; height: 28px; background: transparent; color: #555;
+      border: 1px solid #222; border-radius: 4px; font-size: 11px;
+      cursor: pointer; font-family: inherit;
+    }
+    .density-btn.active { background: #333; color: #e8e8e8; border-color: #444; }
+
+    .toggle {
+      width: 40px; height: 22px; border-radius: 11px; border: none;
+      background: #222; cursor: pointer; position: relative; transition: background 0.2s;
+      flex: 0 0 auto;
+    }
+    .toggle.on { background: #4a9; }
+    .toggle-knob {
+      width: 16px; height: 16px; border-radius: 50%; background: #e8e8e8;
+      position: absolute; top: 3px; left: 3px; transition: left 0.2s;
+    }
+    .toggle.on .toggle-knob { left: 21px; }
+
+    .print-btn {
+      width: 100%; padding: 14px; background: #222; color: #444; border: none;
+      border-radius: 8px; font-size: 14px; font-weight: 700; cursor: not-allowed;
+      font-family: inherit; letter-spacing: 0.02em; transition: all 0.2s;
+    }
+    .print-btn.ready { background: #e8e8e8; color: #0a0a0a; cursor: pointer; }
+    .print-btn.ready:hover { background: #fff; }
+
+    .preview-label {
+      font-size: 11px; color: #555; text-transform: uppercase;
+      letter-spacing: 0.08em; margin-bottom: 8px;
+    }
+    .preview-box {
+      background: #fff; border-radius: 8px; padding: 8px; margin-bottom: 16px;
+      min-height: 100px; display: flex; justify-content: center; align-items: center;
+      overflow: auto;
+    }
+    #previewCanvas { max-width: 100%; height: auto; image-rendering: pixelated; }
+
+    .log-box {
+      background: #111; border: 1px solid #1a1a1a; border-radius: 8px;
+      padding: 12px; max-height: 240px; overflow-y: auto;
+      font-size: 10px; line-height: 1.7;
+    }
+    .log-entry { color: #aaa; white-space: pre-wrap; word-break: break-word; }
+    .log-entry.send { color: #6a8; }
+    .log-entry.error { color: #c66; }
+    .log-entry.ok { color: #7c9; }
+
+    .footer-note { margin-top: 16px; font-size: 10px; color: #777; line-height: 1.6; }
+
+    .no-bluetooth {
+      margin-top: 12px; padding: 12px; background: #1a1010;
+      border: 1px solid #331a1a; border-radius: 8px;
+      font-size: 11px; color: #c66; line-height: 1.5;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .slider-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .slider-row label { font-size: 11px; color: #666; }
+    .slider-row input[type=range] { flex: 1; }
+    .slider-row span { font-size: 11px; color: #888; min-width: 36px; text-align: right; }
+
+    input[type=range] {
+      -webkit-appearance: none; height: 4px; background: #333;
+      border-radius: 2px; outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      border-radius: 50%; background: #e8e8e8; cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div class="header-left">
+      <div class="logo">🖨</div>
+      <div>
+        <div class="title" id="appTitle">Thermal label printer</div>
+        <div class="subtitle" id="appSubtitle">BLE printer</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="battery"></div>
+      <div class="dot" id="statusDot"></div>
+      <button class="btn btn-primary" id="connectBtn" onclick="toggleConnect()">Connect</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="controls">
+      <div class="tabs">
+        <button class="tab active" data-tab="image" onclick="switchTab('image')">Image</button>
+        <button class="tab" data-tab="text" onclick="switchTab('text')">Text</button>
+        <button class="tab" data-tab="test" onclick="switchTab('test')">Test</button>
+      </div>
+
+      <div class="tab-content active" id="tab-image">
+        <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFile(this.files[0])">
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+          Drop image here or click to browse
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-text">
+        <textarea id="textInput" rows="3" placeholder="Type something..." oninput="renderText()">Hello World</textarea>
+        <div class="slider-row">
+          <label>Size</label>
+          <input type="range" id="fontSizeSlider" min="8" max="96" value="32" oninput="renderText()">
+          <span id="fontSizeLabel">32px</span>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-test">
+        <div style="padding: 16px 0; color: #666; font-size: 12px;">
+          Prints a test pattern with alignment marks and a gradient bar.
+        </div>
+      </div>
+
+      <div class="settings-box">
+        <div class="settings-title">Print settings</div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Printer</div>
+            <div class="setting-hint" id="modelHint">Detected when you connect</div>
+          </div>
+          <select id="modelSelect" onchange="setModel(this.value)">
+            <option value="auto">Auto-detect</option>
+            <option value="marklife">Marklife L13 / P12 / P15 (96 px)</option>
+            <option value="luck">C&amp;Co 3128 / DP-L1S (384 px)</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-label">Density</div>
+          <div style="display:flex;gap:4px">
+            <button class="density-btn" data-density="0" onclick="setDensity(0)">☀</button>
+            <button class="density-btn active" data-density="1" onclick="setDensity(1)">◐</button>
+            <button class="density-btn" data-density="2" onclick="setDensity(2)">●</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Dither</div>
+            <div class="setting-hint">Better for photos &amp; gradients</div>
+          </div>
+          <button class="toggle" id="toggleDither" onclick="toggleOption('dither')">
+            <div class="toggle-knob"></div>
+          </button>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Invert</div>
+            <div class="setting-hint">Swap black and white</div>
+          </div>
+          <button class="toggle" id="toggleInvert" onclick="toggleOption('invert')">
+            <div class="toggle-knob"></div>
+          </button>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Label mode</div>
+            <div class="setting-hint">For sticker/label paper</div>
+          </div>
+          <button class="toggle" id="toggleLabel" onclick="toggleOption('label')">
+            <div class="toggle-knob"></div>
+          </button>
+        </div>
+      </div>
+
+      <button class="print-btn" id="printBtn" onclick="doPrint()">Connect printer first</button>
+
+      <div id="noBluetooth" class="no-bluetooth" style="display:none">
+        Web Bluetooth is not supported in this browser. Use Chrome, Edge, or Opera on desktop, or Chrome on Android.
+        Firefox and Safari do not support Web Bluetooth.
+      </div>
+    </div>
+
+    <div class="preview-col">
+      <div class="preview-label">Preview <span id="previewDims"></span></div>
+      <div class="preview-box">
+        <canvas id="previewCanvas" width="384" height="100"></canvas>
+      </div>
+
+      <div class="preview-label">Log</div>
+      <div class="log-box" id="logBox">
+        <div class="log-entry">Waiting for connection...</div>
+      </div>
+
+      <div class="footer-note">
+        Requires Chrome, Edge, Opera, or Chrome on Android with Web Bluetooth.<br>
+        Supports the Marklife L13 / P12 / P15 (96-dot, 12&nbsp;mm) and the C&amp;Co 3128 / DP-L1S (384-dot).
+        <br><br>
+        <a href="https://github.com/ChiaraCannolee/thermal-pocket-printer-basic" style="color:#555">Original project</a>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="workCanvas" style="display:none"></canvas>
+
+  <script>
+    // ── State ──────────────────────────────────────────────────────────
+    const MODELS = {
+      marklife: {
+        name: 'Marklife L13 / P12 / P15',
+        subtitle: '96-dot · 12 mm tape',
+        width: 96,
+        chunkSize: 90,
+        chunkDelay: 30,
+        writeWithResponse: true,
+      },
+      luck: {
+        name: 'C&Co 3128 / DP-L1S',
+        subtitle: '384-dot · 57 mm paper',
+        width: 384,
+        chunkSize: 100,
+        chunkDelay: 50,
+        writeWithResponse: false,
+      },
+    };
+
+    // GATT layouts used by the Marklife family. The C&Co also uses profile A;
+    // the model is what selects the command set, not the profile.
+    const PROFILES = [
+      { id: 'A', service: '0000ff00-0000-1000-8000-00805f9b34fb', tx: '0000ff02-0000-1000-8000-00805f9b34fb', rx: '0000ff01-0000-1000-8000-00805f9b34fb' },
+      { id: 'B', service: '49535343-fe7d-4ae5-8fa9-9fafd205e455', tx: '49535343-8841-43f4-a8d4-ecbe34729bb3', rx: '49535343-1e4d-4bd9-ba61-23c647249616' },
+      { id: 'C', service: '0000fd00-0000-1000-8000-00805f9b34fb', tx: '0000fd01-0000-1000-8000-00805f9b34fb', rx: '0000fd02-0000-1000-8000-00805f9b34fb' },
+      { id: 'D', service: '000018f0-0000-1000-8000-00805f9b34fb', tx: '00002af1-0000-1000-8000-00805f9b34fb', rx: '00002af0-0000-1000-8000-00805f9b34fb' },
+    ];
+
+    const OPTIONAL_SERVICES = [
+      ...PROFILES.map(p => p.service),
+      // Advertised by Marklife chassis; listed so the picker is allowed to see it.
+      'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+    ];
+
+    let bleDevice = null;
+    let server = null;
+    let writeChar = null;
+    let notifyChar = null;
+    let connected = false;
+    let printing = false;
+    let currentTab = 'image';
+    let modelKey = 'marklife';       // active command set / head width
+    let modelChoice = 'auto';        // what the user picked
+    let lastImage = null;
+    let ackWaiter = null;
+    let lastBatteryQuery = 0;
+    let lastModelQuery = 0;
+
+    let settings = { density: 1, dither: false, invert: false, label: false };
+
+    const workCanvas = document.getElementById('workCanvas');
+    const previewCanvas = document.getElementById('previewCanvas');
+    const workCtx = workCanvas.getContext('2d', { willReadFrequently: true });
+    const previewCtx = previewCanvas.getContext('2d');
+
+    // ── Check Web Bluetooth ────────────────────────────────────────────
+    if (!navigator.bluetooth) {
+      document.getElementById('noBluetooth').style.display = 'block';
+    }
+
+    // ── Logging ────────────────────────────────────────────────────────
+    function addLog(msg, type = '') {
+      const box = document.getElementById('logBox');
+      const div = document.createElement('div');
+      div.className = 'log-entry' + (type ? ' ' + type : '');
+      div.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+      while (box.children.length > 120) box.removeChild(box.firstChild);
+    }
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    function hex(bytes) {
+      return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+    }
+
+    // ── Model selection ────────────────────────────────────────────────
+    function currentModel() {
+      return MODELS[modelKey] || MODELS.marklife;
+    }
+
+    // The Marklife head is 96 dots ACROSS a 12 mm tape. Its label runs the
+    // other way, so we lay the canvas out as length x 96 (readable) and
+    // transpose it into 12-byte raster rows when printing.
+    function isMarklifeModel() {
+      return modelKey === 'marklife';
+    }
+
+    function applyModel(key, reason) {
+      if (key !== 'marklife' && key !== 'luck') return;
+      const changed = modelKey !== key;
+      modelKey = key;
+      document.getElementById('appTitle').textContent = currentModel().name;
+      document.getElementById('appSubtitle').textContent = currentModel().subtitle;
+      document.getElementById('modelHint').textContent = reason || currentModel().subtitle;
+      if (changed) {
+        rerender();
+        addLog('Using ' + currentModel().name + ' (' +
+          (isMarklifeModel() ? '96 px across the tape' : currentModel().width + ' px wide') + ')');
+      }
+    }
+
+    function setModel(value) {
+      modelChoice = value;
+      if (value === 'auto') {
+        applyModel(detectModel(bleDevice && bleDevice.name), 'Auto-detected from the device name');
+      } else {
+        applyModel(value, 'Selected manually');
+      }
+    }
+
+    function detectModel(name) {
+      if (!name) return 'marklife';
+      if (/^c\s*&?\s*co|crafts|dpl1s|dp-l1s|3128/i.test(name)) return 'luck';
+      // Names are like L13_XXXX_BLE, so allow '_' after the model number.
+      if (/^(l13|p12|p15|p15r|lp15|lp25|a1|r15|lp90)(?:[_\s-]|$)/i.test(name)) return 'marklife';
+      return 'marklife';
+    }
+
+    function rerender() {
+      if (currentTab === 'text') renderText();
+      else if (currentTab === 'test') renderTest();
+      else if (lastImage) drawImage(lastImage);
+      else renderTest();
+    }
+
+    // ── BLE Connection ─────────────────────────────────────────────────
+    async function toggleConnect() {
+      if (connected) {
+        try { if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect(); } catch { }
+        connected = false;
+        writeChar = null;
+        notifyChar = null;
+        server = null;
+        updateUI();
+        addLog('Disconnected');
+      } else {
+        await doConnect();
+      }
+    }
+
+    async function requestPrinter() {
+      try {
+        return await navigator.bluetooth.requestDevice({
+          filters: [
+            { namePrefix: 'C&Co' },
+            { namePrefix: 'L13' },
+            { namePrefix: 'P12' },
+            { namePrefix: 'P15' },
+          ],
+          optionalServices: OPTIONAL_SERVICES,
+        });
+      } catch (e) {
+        // The chooser shows every LE device only if we ask for it. This is
+        // also the path a rebrand takes when its name does not match a prefix.
+        if (e.name !== 'NotFoundError') throw e;
+        addLog('No known printer name found, showing all nearby Bluetooth LE devices...');
+        return await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: OPTIONAL_SERVICES,
+        });
+      }
+    }
+
+    async function doConnect() {
+      updateStatus('connecting');
+      addLog('Scanning for printer...');
+
+      try {
+        bleDevice = await requestPrinter();
+        addLog('Found: ' + (bleDevice.name || 'unknown'));
+
+        if (modelChoice === 'auto') {
+          applyModel(detectModel(bleDevice.name), 'Auto-detected from the device name');
+        } else {
+          applyModel(modelChoice, 'Selected manually');
+        }
+
+        bleDevice.addEventListener('gattserverdisconnected', () => {
+          connected = false;
+          writeChar = null;
+          notifyChar = null;
+          server = null;
+          updateUI();
+          addLog('Disconnected (device)', 'error');
+        });
+
+        // Linux/BlueZ sometimes fails the first attempt on a dual-mode
+        // device. One clean retry is cheap and harmless.
+        let lastError = null;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            server = await bleDevice.gatt.connect();
+            lastError = null;
+            break;
+          } catch (e) {
+            lastError = e;
+            addLog('Connect attempt ' + attempt + ' failed: ' + e.message, 'error');
+            try { bleDevice.gatt.disconnect(); } catch { }
+            if (attempt < 2) await sleep(1200);
+          }
+        }
+        if (lastError) throw lastError;
+
+        const resolved = await resolveProfile(server);
+        writeChar = resolved.tx;
+        notifyChar = resolved.rx;
+
+        if (notifyChar) {
+          try {
+            await notifyChar.startNotifications();
+            notifyChar.addEventListener('characteristicvaluechanged', onNotification);
+            addLog('Notifications on ' + shortUuid(notifyChar.uuid));
+          } catch (e) {
+            addLog('Notifications unavailable: ' + e.message);
+          }
+        }
+
+        connected = true;
+        updateUI();
+        addLog('Connected via GATT profile ' + resolved.profile.id + '!', 'ok');
+
+        await sleep(300);
+        // These queries are shared by both families.
+        try {
+          lastModelQuery = Date.now();
+          await writeAll(new Uint8Array([0x10, 0xff, 0x20, 0xf0]), currentModel().writeWithResponse);
+          await sleep(120);
+          lastBatteryQuery = Date.now();
+          await writeAll(new Uint8Array([0x10, 0xff, 0x50, 0xf1]), currentModel().writeWithResponse);
+        } catch (e) {
+          addLog('Query failed: ' + e.message);
+        }
+      } catch (e) {
+        connected = false;
+        updateUI();
+        addLog('Connection failed: ' + e.message, 'error');
+        explainConnectError(e);
+      }
+    }
+
+    function explainConnectError(e) {
+      const msg = (e && e.message) || '';
+      if (/Unknown error when connecting|Connection failed for unknown reason/i.test(msg)) {
+        addLog(
+          'Linux/BlueZ hint: this printer is dual-mode. BlueZ tries its Classic ' +
+          'Bluetooth side first and reports BREDR.ProfileUnavailable, which Chrome ' +
+          'turns into "Unknown error when connecting to the device".\n' +
+          'Fix: set the LE bearer for this one device, e.g.\n' +
+          '  bluetoothctl bearer <L13_..._BLE address> le\n' +
+          'then reconnect. See l13/README.md (needs Experimental=true in ' +
+          '/etc/bluetooth/main.conf to expose that property).',
+          'error');
+      } else if (/No Services matching|No Services found/i.test(msg)) {
+        addLog('The device connected but exposed none of the known GATT profiles. ' +
+          'Send me the service list from chrome://bluetooth-internals.', 'error');
+      }
+    }
+
+    async function resolveProfile(gattServer) {
+      const tried = [];
+      // Prefer the device's advertised name, then fall back to probing every
+      // layout a Marklife chassis is known to host.
+      for (const profile of PROFILES) {
+        try {
+          const service = await gattServer.getPrimaryService(profile.service);
+          const tx = await service.getCharacteristic(profile.tx);
+          let rx = null;
+          try { rx = await service.getCharacteristic(profile.rx); } catch { }
+          addLog('GATT profile ' + profile.id + ' (' + shortUuid(profile.service) +
+            ') tx=' + shortUuid(tx.uuid) + (rx ? ' rx=' + shortUuid(rx.uuid) : ' rx=missing'));
+          return { profile, tx, rx };
+        } catch (err) {
+          tried.push(profile.id + ':' + err.name);
+        }
+      }
+      throw new Error('No known GATT profile found. Tried ' + tried.join(', '));
+    }
+
+    function shortUuid(uuid) {
+      return String(uuid).replace(/-0000-1000-8000-00805f9b34fb$/, '').replace(/^0000/, '');
+    }
+
+    async function writeAll(data, withResponse = false) {
+      if (!writeChar) throw new Error('not connected');
+      const props = writeChar.properties;
+      if (withResponse && props.write) {
+        if (writeChar.writeValueWithResponse) await writeChar.writeValueWithResponse(data);
+        else await writeChar.writeValue(data);
+      } else if (props.writeWithoutResponse) {
+        await writeChar.writeValueWithoutResponse(data);
+      } else if (props.write) {
+        if (writeChar.writeValueWithResponse) await writeChar.writeValueWithResponse(data);
+        else await writeChar.writeValue(data);
+      } else {
+        throw new Error('characteristic is not writable');
+      }
+    }
+
+    function onNotification(event) {
+      const val = new Uint8Array(event.target.value.buffer);
+      const ascii = (() => {
+        try {
+          const s = new TextDecoder().decode(val);
+          return /^[\x20-\x7e\r\n]+$/.test(s) ? s.trim() : '';
+        } catch { return ''; }
+      })();
+      addLog('← ' + hex(val) + (ascii ? ' (' + ascii + ')' : ''), 'send');
+
+      // Job acknowledgement (L11) — a single 0xAA.
+      if (val.length === 1 && val[0] === 0xaa) {
+        if (ackWaiter) { const r = ackWaiter; ackWaiter = null; r(true); }
+        return;
+      }
+
+      // Battery reply to 10 FF 50 F1: two bytes, byte[1] is the percentage.
+      if (Date.now() - lastBatteryQuery < 3000 && val.length === 2 && val[1] <= 100) {
+        const bat = document.getElementById('battery');
+        bat.textContent = '🔋 ' + val[1] + '%';
+        bat.style.display = 'block';
+        bat.style.color = val[1] > 20 ? '#4a9' : '#e55';
+      }
+    }
+
+    function waitForAck(ms = 6000) {
+      return new Promise(resolve => {
+        const timer = setTimeout(() => {
+          if (ackWaiter === done) ackWaiter = null;
+          resolve(false);
+        }, ms);
+        function done(ok) { clearTimeout(timer); resolve(ok); }
+        ackWaiter = done;
+      });
+    }
+
+    async function sendChunked(data, chunkSize, delayMs, withResponse = false) {
+      let sent = 0;
+      while (sent < data.length) {
+        const chunk = data.slice(sent, sent + chunkSize);
+        await writeAll(chunk, withResponse);
+        sent += chunk.length;
+        if (sent < data.length) await sleep(delayMs);
+      }
+      addLog('→ Sent ' + data.length.toLocaleString() + ' bytes', 'send');
+    }
+
+    // ── UI Updates ─────────────────────────────────────────────────────
+    function updateStatus(s) {
+      const dot = document.getElementById('statusDot');
+      dot.className = 'dot' + (s === 'connected' ? ' connected' : s === 'connecting' ? ' connecting' : '');
+    }
+
+    function updateUI() {
+      updateStatus(connected ? 'connected' : 'disconnected');
+      const btn = document.getElementById('connectBtn');
+      btn.textContent = connected ? 'Disconnect' : 'Connect';
+      btn.className = 'btn ' + (connected ? 'btn-secondary' : 'btn-primary');
+      if (!connected) document.getElementById('battery').style.display = 'none';
+      updatePrintBtn();
+    }
+
+    function updatePrintBtn() {
+      const btn = document.getElementById('printBtn');
+      const ready = connected && !printing && workCanvas.width > 0;
+      btn.className = 'print-btn' + (ready ? ' ready' : '');
+      btn.textContent = printing ? 'Printing...' : !connected ? 'Connect printer first' : 'Print';
+    }
+
+    // ── Tabs ───────────────────────────────────────────────────────────
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tab));
+
+      if (tab === 'text') renderText();
+      if (tab === 'test') renderTest();
+    }
+
+    // ── Settings ───────────────────────────────────────────────────────
+    function setDensity(d) {
+      settings.density = d;
+      document.querySelectorAll('.density-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.density) === d));
+    }
+
+    function toggleOption(opt) {
+      settings[opt] = !settings[opt];
+      const el = document.getElementById('toggle' + opt.charAt(0).toUpperCase() + opt.slice(1));
+      el.classList.toggle('on', settings[opt]);
+      updatePreview();
+    }
+
+    // ── Image Loading ──────────────────────────────────────────────────
+    function handleFile(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          lastImage = img;
+          drawImage(img);
+          addLog('Image loaded: ' + img.width + 'x' + img.height + ' → ' +
+            workCanvas.width + 'x' + workCanvas.height);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function drawImage(img) {
+      if (isMarklifeModel()) {
+        // Across the tape is fixed at 96 dots; the label length follows the
+        // image aspect ratio, capped at 80 mm (640 dots).
+        const across = MODELS.marklife.width;
+        let length = Math.round(img.width * across / img.height);
+        length = Math.max(across, Math.min(640, length));
+        workCanvas.width = length;
+        workCanvas.height = across;
+        workCtx.fillStyle = 'white';
+        workCtx.fillRect(0, 0, length, across);
+        const scale = Math.min(length / img.width, across / img.height);
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        workCtx.drawImage(img, Math.round((length - w) / 2), Math.round((across - h) / 2), w, h);
+      } else {
+        const width = currentModel().width;
+        const ratio = width / img.width;
+        const newH = Math.max(1, Math.round(img.height * ratio));
+        workCanvas.width = width;
+        workCanvas.height = newH;
+        workCtx.fillStyle = 'white';
+        workCtx.fillRect(0, 0, width, newH);
+        workCtx.drawImage(img, 0, 0, width, newH);
+      }
+      updatePreview();
+      updatePrintBtn();
+    }
+
+    // Drag and drop
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+
+    // ── Text Rendering ─────────────────────────────────────────────────
+    function renderText() {
+      const text = document.getElementById('textInput').value || ' ';
+      const fontSize = parseInt(document.getElementById('fontSizeSlider').value);
+      document.getElementById('fontSizeLabel').textContent = fontSize + 'px';
+
+      const lines = text.split('\n');
+
+      if (isMarklifeModel()) {
+        const across = MODELS.marklife.width;
+        const padding = 8;
+        // Shrink to fit the 96-dot tape height if there are several lines.
+        const size = Math.min(fontSize, Math.max(8, Math.floor(across / (lines.length * 1.15))));
+
+        workCanvas.width = across;
+        workCanvas.height = across;
+        workCtx.font = 'bold ' + size + 'px sans-serif';
+        let maxWidth = 0;
+        for (const line of lines) maxWidth = Math.max(maxWidth, workCtx.measureText(line || ' ').width);
+
+        const length = Math.max(across, Math.ceil(maxWidth + padding * 2));
+        workCanvas.width = length;
+        workCanvas.height = across;
+        workCtx.fillStyle = 'white';
+        workCtx.fillRect(0, 0, length, across);
+        workCtx.fillStyle = 'black';
+        workCtx.font = 'bold ' + size + 'px sans-serif';
+        workCtx.textAlign = 'center';
+        workCtx.textBaseline = 'middle';
+
+        const lineHeight = size * 1.15;
+        lines.forEach((line, i) => {
+          const y = across / 2 + (i - (lines.length - 1) / 2) * lineHeight;
+          workCtx.fillText(line, length / 2, y);
+        });
+      } else {
+        const width = currentModel().width;
+        const padding = Math.max(4, Math.round(width / 24));
+        const lineHeight = fontSize * 1.3;
+        const h = Math.max(Math.round(width / 2), Math.round(lines.length * lineHeight + padding * 2));
+
+        workCanvas.width = width;
+        workCanvas.height = h;
+        workCtx.fillStyle = 'white';
+        workCtx.fillRect(0, 0, width, h);
+        workCtx.fillStyle = 'black';
+        workCtx.font = 'bold ' + fontSize + 'px sans-serif';
+        workCtx.textAlign = 'center';
+        workCtx.textBaseline = 'top';
+
+        lines.forEach((line, i) => {
+          workCtx.fillText(line, width / 2, padding + i * lineHeight);
+        });
+      }
+
+      updatePreview();
+      updatePrintBtn();
+    }
+
+    // ── Test Pattern ───────────────────────────────────────────────────
+    function renderTest() {
+      if (isMarklifeModel()) {
+        const across = MODELS.marklife.width;
+        const length = 320; // 40 mm at 8 dots/mm
+        workCanvas.width = length;
+        workCanvas.height = across;
+        workCtx.fillStyle = 'white';
+        workCtx.fillRect(0, 0, length, across);
+
+        workCtx.strokeStyle = 'black';
+        workCtx.lineWidth = 2;
+        workCtx.strokeRect(1, 1, length - 2, across - 2);
+
+        workCtx.fillStyle = 'black';
+        workCtx.font = 'bold 18px sans-serif';
+        workCtx.textAlign = 'left';
+        workCtx.textBaseline = 'top';
+        workCtx.fillText('TEST PRINT', 10, 10);
+        workCtx.font = '11px sans-serif';
+        workCtx.fillText(across + ' px / 12 mm tape', 10, 32);
+
+        // Gradient along the length.
+        for (let x = 10; x < length - 10; x++) {
+          const g = Math.round(((x - 10) / (length - 20)) * 255);
+          workCtx.fillStyle = 'rgb(' + g + ',' + g + ',' + g + ')';
+          workCtx.fillRect(x, 48, 1, 14);
+        }
+
+        // Checkerboard.
+        workCtx.fillStyle = 'black';
+        for (let cy = 68; cy < 88; cy += 4) {
+          for (let cx = 10; cx < 58; cx += 4) {
+            if (((cx + cy) / 4 | 0) % 2 === 0) workCtx.fillRect(cx, cy, 4, 4);
+          }
+        }
+
+        workCtx.font = '11px sans-serif';
+        workCtx.fillStyle = 'black';
+        workCtx.fillText('gradient + checkerboard', 70, 72);
+
+        updatePreview();
+        updatePrintBtn();
+        return;
+      }
+
+      const width = currentModel().width;
+      const h = Math.max(120, Math.round(width * 1.4));
+      workCanvas.width = width;
+      workCanvas.height = h;
+      workCtx.fillStyle = 'white';
+      workCtx.fillRect(0, 0, width, h);
+
+      workCtx.strokeStyle = 'black';
+      workCtx.lineWidth = 2;
+      workCtx.strokeRect(1, 1, width - 2, h - 2);
+
+      workCtx.fillStyle = 'black';
+      workCtx.font = 'bold ' + Math.max(10, Math.round(width / 8)) + 'px sans-serif';
+      workCtx.textAlign = 'center';
+      workCtx.textBaseline = 'top';
+      workCtx.fillText('TEST PRINT', width / 2, Math.round(h * 0.12));
+      workCtx.font = Math.max(8, Math.round(width / 14)) + 'px sans-serif';
+      workCtx.fillText(width + ' px wide', width / 2, Math.round(h * 0.3));
+
+      // Gradient
+      const gy = Math.round(h * 0.45);
+      const gh = Math.max(8, Math.round(h * 0.12));
+      for (let x = 6; x < width - 6; x++) {
+        const g = Math.round(((x - 6) / (width - 12)) * 255);
+        workCtx.fillStyle = 'rgb(' + g + ',' + g + ',' + g + ')';
+        workCtx.fillRect(x, gy, 1, gh);
+      }
+
+      // Checkerboard
+      workCtx.fillStyle = 'black';
+      const cell = Math.max(2, Math.round(width / 24));
+      for (let cy = Math.round(h * 0.66); cy < Math.round(h * 0.86); cy += cell) {
+        for (let cx = 6; cx < 6 + cell * 8; cx += cell) {
+          if (((cx + cy) / cell | 0) % 2 === 0) workCtx.fillRect(cx, cy, cell, cell);
+        }
+      }
+
+      workCtx.font = Math.max(7, Math.round(width / 16)) + 'px sans-serif';
+      workCtx.fillStyle = 'black';
+      workCtx.fillText('gradient bar', width / 2, Math.round(h * 0.9));
+
+      updatePreview();
+      updatePrintBtn();
+    }
+
+    // ── Preview ────────────────────────────────────────────────────────
+    function updatePreview() {
+      const w = workCanvas.width;
+      const h = workCanvas.height;
+      if (w === 0 || h === 0) return;
+
+      previewCanvas.width = w;
+      previewCanvas.height = h;
+      document.getElementById('previewDims').textContent = isMarklifeModel()
+        ? '· ' + w + ' px long × ' + h + ' across'
+        : '· ' + w + '×' + h + ' px';
+
+      const srcData = workCtx.getImageData(0, 0, w, h).data;
+      const grey = new Float32Array(w * h);
+      for (let i = 0; i < w * h; i++) {
+        grey[i] = srcData[i * 4] * 0.299 + srcData[i * 4 + 1] * 0.587 + srcData[i * 4 + 2] * 0.114;
+      }
+
+      applyDitherAndThreshold(grey, w, h);
+
+      const out = previewCtx.createImageData(w, h);
+      for (let i = 0; i < w * h; i++) {
+        const val = Math.max(0, Math.min(255, grey[i]));
+        const dark = settings.invert ? val >= 128 : val < 128;
+        const c = dark ? 0 : 255;
+        out.data[i * 4] = c;
+        out.data[i * 4 + 1] = c;
+        out.data[i * 4 + 2] = c;
+        out.data[i * 4 + 3] = 255;
+      }
+      previewCtx.putImageData(out, 0, 0);
+
+      // A 96 px strip is unreadable at 1:1; show it at 2x.
+      previewCanvas.style.width = w < 200 ? (w * 2) + 'px' : '';
+    }
+
+    function applyDitherAndThreshold(grey, w, h) {
+      if (!settings.dither) return;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const idx = y * w + x;
+          const old = grey[idx];
+          const nw = old >= 128 ? 255 : 0;
+          grey[idx] = nw;
+          const err = old - nw;
+          if (x + 1 < w) grey[idx + 1] += err * 7 / 16;
+          if (y + 1 < h) {
+            if (x > 0) grey[(y + 1) * w + (x - 1)] += err * 3 / 16;
+            grey[(y + 1) * w + x] += err * 5 / 16;
+            if (x + 1 < w) grey[(y + 1) * w + (x + 1)] += err * 1 / 16;
+          }
+        }
+      }
+    }
+
+    // ── Bitmap Conversion ──────────────────────────────────────────────
+    // The Marklife canvas is length × 96 (readable orientation). The wire
+    // format needs 12-byte rows ACROSS the tape, so this transposes.
+    function canvasToBitmap() {
+      const w = workCanvas.width;
+      const h = workCanvas.height;
+      const srcData = workCtx.getImageData(0, 0, w, h).data;
+
+      const grey = new Float32Array(w * h);
+      for (let i = 0; i < w * h; i++) {
+        grey[i] = srcData[i * 4] * 0.299 + srcData[i * 4 + 1] * 0.587 + srcData[i * 4 + 2] * 0.114;
+      }
+
+      applyDitherAndThreshold(grey, w, h);
+
+      const isDark = (i) => {
+        const val = Math.max(0, Math.min(255, grey[i]));
+        return settings.invert ? val >= 128 : val < 128;
+      };
+
+      if (isMarklifeModel()) {
+        const length = w;          // along the tape
+        const across = h;          // 96 dots across the tape
+        const bytesPerColumn = Math.ceil(across / 8);
+        const bitmap = new Uint8Array(bytesPerColumn * length);
+
+        // This is LaBLEr's ColumnPacker.packColumns(): each column x is
+        // mirrored vertically (invertedY) and packed LSB-first within each
+        // group of 8. That is what turns the readable length x 96 canvas
+        // into 12-byte rows across the print head.
+        let i = 0;
+        for (let x = 0; x < length; x++) {
+          for (let y = 0; y < across; y += 8) {
+            const invertedY = across - 8 - y;
+            let b = 0;
+            for (let bit = 0; bit < 8; bit++) {
+              const yy = invertedY + bit;
+              if (yy >= 0 && yy < across && isDark(yy * w + x)) {
+                b |= (1 << bit);
+              }
+            }
+            bitmap[i++] = b;
+          }
+        }
+
+        const header = new Uint8Array([
+          0x1d, 0x76, 0x30, 0x00,
+          bytesPerColumn & 0xff, (bytesPerColumn >> 8) & 0xff,
+          length & 0xff, (length >> 8) & 0xff,
+        ]);
+        const result = new Uint8Array(header.length + bitmap.length);
+        result.set(header);
+        result.set(bitmap, header.length);
+        return result;
+      }
+
+      const widthBytes = Math.ceil(w / 8);
+      const bitmap = new Uint8Array(widthBytes * h);
+      for (let y = 0; y < h; y++) {
+        for (let xb = 0; xb < widthBytes; xb++) {
+          let byte = 0;
+          for (let bit = 0; bit < 8; bit++) {
+            const x = xb * 8 + bit;
+            if (x < w && isDark(y * w + x)) {
+              byte |= (128 >> bit);
+            }
+          }
+          bitmap[y * widthBytes + xb] = byte;
+        }
+      }
+
+      // GS v 0: 1D 76 30 m wL wH hL hH
+      const header = new Uint8Array([
+        0x1d, 0x76, 0x30, 0x00,
+        widthBytes & 0xff, (widthBytes >> 8) & 0xff,
+        h & 0xff, (h >> 8) & 0xff,
+      ]);
+      const result = new Uint8Array(header.length + bitmap.length);
+      result.set(header);
+      result.set(bitmap, header.length);
+      return result;
+    }
+
+    function concat(parts) {
+      let total = 0;
+      for (const p of parts) total += p.length;
+      const out = new Uint8Array(total);
+      let off = 0;
+      for (const p of parts) { out.set(p, off); off += p.length; }
+      return out;
+    }
+
+    // ── Print ──────────────────────────────────────────────────────────
+    async function doPrint() {
+      if (!connected || !writeChar || printing) return;
+      printing = true;
+      updatePrintBtn();
+
+      try {
+        const raster = canvasToBitmap();
+        addLog('Raster: ' + (isMarklifeModel()
+          ? workCanvas.width + ' px long × ' + workCanvas.height + ' across'
+          : workCanvas.width + '×' + workCanvas.height) +
+          ' (' + raster.length.toLocaleString() + ' bytes)');
+
+        if (modelKey === 'luck') {
+          await printLuck(raster);
+        } else {
+          await printMarklife(raster);
+        }
+      } catch (e) {
+        addLog('Print error: ' + e.message, 'error');
+      }
+
+      printing = false;
+      updatePrintBtn();
+    }
+
+    // Marklife L13/P12/P15 — "L11" protocol: 0x10FF session + GS v 0 raster.
+    function buildMarklifeJob(raster) {
+      const parts = [];
+
+      // 10 FF 40 — init. Verified on the P15/P12 family.
+      parts.push(new Uint8Array([0x10, 0xff, 0x40]));
+
+      // Density is opt-in. 1 = light, 2 = normal, 3 = dark.
+      // Normal (the default) is left out so the printer keeps its stored value.
+      if (settings.density !== 1) {
+        parts.push(new Uint8Array([0x1f, 0x70, 0x02, settings.density === 0 ? 1 : 3]));
+      }
+
+      // 15 NULs, then 10 FF F1 02 (enable).
+      parts.push(new Uint8Array(15));
+      parts.push(new Uint8Array([0x10, 0xff, 0xf1, 0x02]));
+
+      parts.push(raster);
+
+      if (settings.label) {
+        // 1D 0C — advance to the next die-cut label edge.
+        parts.push(new Uint8Array([0x1d, 0x0c]));
+        parts.push(new Uint8Array([0x10, 0xff, 0xf1, 0x45]));
+        // The P15/P12 family ends a die-cut job with two extra inits.
+        parts.push(new Uint8Array([0x10, 0xff, 0x40]));
+        parts.push(new Uint8Array([0x10, 0xff, 0x40]));
+      } else {
+        // ESC J 91 — continuous paper feed, then 10 FF F1 45 (stop).
+        parts.push(new Uint8Array([0x1b, 0x4a, 91]));
+        parts.push(new Uint8Array([0x10, 0xff, 0xf1, 0x45]));
+      }
+
+      return concat(parts);
+    }
+
+    async function printMarklife(raster) {
+      const job = buildMarklifeJob(raster);
+      const ack = waitForAck(10000);
+      addLog('Sending ' + (settings.label ? 'label' : 'continuous') + ' job (' +
+        job.length.toLocaleString() + ' bytes)...');
+      await sendChunked(job, currentModel().chunkSize, currentModel().chunkDelay, currentModel().writeWithResponse);
+      const ok = await ack;
+      addLog(ok ? 'Printer acknowledged the job (0xAA).' : 'No 0xAA ack (job may still print).', ok ? 'ok' : '');
+    }
+
+    // C&Co 3128 / DP-L1S — original LuckPrinter ESC/POS variant.
+    async function printLuck(raster) {
+      addLog('Enabling printer...');
+      await writeAll(new Uint8Array([0x10, 0xff, 0xf1, 0x03]));
+      await sleep(300);
+
+      addLog('Waking up...');
+      await writeAll(new Uint8Array(12));
+      await sleep(300);
+
+      await writeAll(new Uint8Array([0x10, 0xff, 0x10, 0x00, settings.density]));
+      await sleep(200);
+
+      if (settings.label) {
+        await writeAll(new Uint8Array([0x1f, 0x11, 0x51]));
+        await sleep(200);
+      }
+
+      await sendChunked(raster, currentModel().chunkSize, currentModel().chunkDelay, currentModel().writeWithResponse);
+      await sleep(2000);
+
+      if (settings.label) {
+        addLog('Positioning label...');
+        await writeAll(new Uint8Array([0x1d, 0x0c]));
+        await sleep(300);
+        await writeAll(new Uint8Array([0x1f, 0x11, 0x50]));
+        await sleep(200);
+      } else {
+        addLog('Feeding paper...');
+        await writeAll(new Uint8Array([0x1b, 0x4a, 80]));
+        await sleep(300);
+      }
+
+      addLog('Stopping job...');
+      await writeAll(new Uint8Array([0x10, 0xff, 0xf1, 0x45]));
+      await sleep(3000);
+      addLog('Print complete!', 'ok');
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────
+    applyModel('marklife', 'Default (L13 / P12 / P15)');
+    renderTest();
+  </script>
+</body>
+
+</html>
