@@ -99,7 +99,7 @@ device and still honoured.
 
 If you prefer not to touch the BlueZ config, either use Chrome on
 Android (Android connects over LE directly) or set the global
-ControllerMode = le (see l13/README.md for the trade-off).
+ControllerMode = le (see l13/LINUX.md for the trade-off).
 EOF
   exit 2
 fi
