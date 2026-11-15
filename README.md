@@ -118,4 +118,4 @@ repacking is needed.
 
 Based on
 [thermal-pocket-printer-basic](https://github.com/ChiaraCannolee/thermal-pocket-printer-basic)
-by ChiaraCannolee. The original C&Co 3128 / DP-L1S path remains available.
+by ChiaraCannolee.
